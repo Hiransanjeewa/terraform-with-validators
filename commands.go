@@ -7,6 +7,8 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"fmt"
+    "os/exec"
 
 	"github.com/hashicorp/cli"
 	"github.com/hashicorp/go-plugin"
@@ -121,6 +123,13 @@ func initCommands(
 
 	Commands = map[string]cli.CommandFactory{
 		"apply": func() (cli.Command, error) {
+			// Execute TFLint and TFSec
+			err := runTFLintAndTFSec()
+			if err != nil {
+				return nil, fmt.Errorf("pre-checks failed: %v", err)
+			}
+	
+			// Proceeding with the original ApplyCommand
 			return &command.ApplyCommand{
 				Meta: meta,
 			}, nil
@@ -478,3 +487,27 @@ func credentialsSource(config *cliconfig.Config) (auth.CredentialsSource, error)
 	helperPlugins := pluginDiscovery.FindPlugins("credentials", cliconfig.GlobalPluginDirs())
 	return config.CredentialsSource(helperPlugins)
 }
+
+func runTFLintAndTFSec() error {
+	// Run TFLint
+	fmt.Println("Running TFLint...")
+	tflintCmd := exec.Command("tflint")
+	tflintCmd.Stdout = os.Stdout
+	tflintCmd.Stderr = os.Stderr
+	if err := tflintCmd.Run(); err != nil {
+		return fmt.Errorf("TFLint check failed: %v", err)
+	}
+
+	// Run TFSec
+	fmt.Println("Running TFSec...")
+	tfsecCmd := exec.Command("tfsec")
+	tfsecCmd.Stdout = os.Stdout
+	tfsecCmd.Stderr = os.Stderr
+	if err := tfsecCmd.Run(); err != nil {
+		return fmt.Errorf("TFSec check failed: %v", err)
+	}
+
+	fmt.Println("Pre-checks passed successfully!")
+	return nil
+}
+
